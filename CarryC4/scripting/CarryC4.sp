@@ -24,6 +24,7 @@ Please note that the unplant bomb feature is not natural, and expect glitches.
 
 
 SetEntProp(plantedC4, Prop_Send, "m_bBombTicking", false);
+SetEntPropFloat(plantedC4, Prop_Send, "m_flTimerLength", );
 AcceptEntityInput(plantedC4, "Kill");
 GameRules_SetProp("m_bBombPlanted", false, _, _, true);
 
@@ -35,7 +36,10 @@ GameRules_SetProp("m_bBombPlanted", false, _, _, true);
 int plyCarryingC4;
 bool c4Planted = false;
 int plantedC4;
+int secondaryC4;
 int c4weapon;
+
+float emptyVector[3];
 
 // ConVars
 //ConVar cDistanceFromSiteA;
@@ -86,13 +90,7 @@ public void OnClientPutInServer(int client) {
 public Action OnWeaponCanUse(int client, int weapon) {
 	if(!client || !c4Planted) return Plugin_Continue;
 	if(weapon == EntRefToEntIndex(c4weapon)) {
-		if(cPickupBomb.IntValue > 0) {
-			plyCarryingC4 = GetClientUserId(client);
-			PrintToChatAll("Equiping C4");
-			AcceptEntityInput(plantedC4, "ClearParent");
-			parentEntity(plantedC4, client, "c4");
-			SetEntityRenderMode(weapon, RENDER_NONE);
-		} else {
+		if(cPickupBomb.IntValue == 0) {
 			return Plugin_Handled;
 		}
 	}
@@ -105,7 +103,6 @@ public Action OnWeaponSwitch(int client, int weapon) {
 	if(client != c4client) return Plugin_Continue;
 	if(!IsValidEntity(plantedC4)) return Plugin_Continue;
 	if(weapon == EntRefToEntIndex(c4weapon)) {
-		PrintToChatAll("Switch to C4");
 		AcceptEntityInput(plantedC4, "ClearParent");
 		parentEntity(plantedC4, client, "legacy_weapon_bone");
 		float pos[3], ang[3];
@@ -119,7 +116,6 @@ public Action OnWeaponSwitch(int client, int weapon) {
 		SetEntityRenderColor(weapon, 255, 255, 255, 0);
 		SetEntityRenderMode(weapon, RENDER_NONE);
 	} else {
-		PrintToChatAll("Switch other than C4");
 		AcceptEntityInput(plantedC4, "ClearParent");
 		parentEntity(plantedC4, client, "c4");
 		float pos[3];
@@ -133,10 +129,16 @@ public Action OnWeaponEquip(int client, int weapon) {
 	if(!client || !c4Planted) return Plugin_Continue;
 	if(weapon == EntRefToEntIndex(c4weapon)) {
 		plyCarryingC4 = GetClientUserId(client);
-		PrintToChatAll("Equiping C4");
 		AcceptEntityInput(plantedC4, "ClearParent");
 		parentEntity(plantedC4, client, "c4");
+		float pos[3];
+		pos[2] = -2.0;
+		TeleportEntity(plantedC4, pos, NULL_VECTOR, NULL_VECTOR);
 		SetEntityRenderMode(weapon, RENDER_NONE);
+		float fPos[3];
+		GetClientAbsOrigin(client, fPos);
+		TeleportEntity(secondaryC4, fPos, emptyVector, NULL_VECTOR);
+		parentEntity(secondaryC4, client, "");
 	}
 	return Plugin_Continue;
 }
@@ -147,11 +149,10 @@ public Action OnWeaponDrop(int client, int weapon) {
 		if(cDroppableBomb.IntValue > 0) {
 			plyCarryingC4 = -1;
 			AcceptEntityInput(plantedC4, "ClearParent");
-			PrintToChatAll("Dropping C4");
+			AcceptEntityInput(secondaryC4, "ClearParent");
 			SetEntityRenderMode(weapon, RENDER_NONE);
 			parentEntity(plantedC4, c4weapon, "");
-			float pos[3];
-			TeleportEntity(plantedC4, pos, pos, NULL_VECTOR);
+			TeleportEntity(plantedC4, emptyVector, emptyVector, NULL_VECTOR);
 		} else {
 			return Plugin_Handled;
 		}
@@ -164,6 +165,7 @@ public OnPostThinkPost(client) {
 	int c4client = GetClientOfUserId(plyCarryingC4);
 	if(client != c4client) return;
 	if(!IsValidEntity(plantedC4)) return;
+	//Remove the c4 from the player's back.
 	SetEntProp(client, Prop_Send, "m_iAddonBits", GetEntProp(client, Prop_Send, "m_iAddonBits") & ~(1<<4));
 }
 
@@ -171,27 +173,59 @@ public Action Event_BombPlanted(Event event, const char[] name, bool dontBroadca
 	c4Planted = true;
 	int c4 = -1;
 	c4 = FindEntityByClassname(c4, "planted_c4");
-	if(c4 != -1) {
-		plantedC4 = EntIndexToEntRef(c4);
+	if(IsValidEntity(c4)) {
 		plyCarryingC4 = GetEventInt(event, "userid");
 		int player = GetClientOfUserId(plyCarryingC4);
 		if(player > 0) {
+			//This c4 is used for the client that is holding the bomb to be able to hear the beeps.
+			//This will also unparent and kill itself before explosion
+			int c42 = CreateEntityByName("planted_c4");
+			float bombTime = GetEntPropFloat(c4, Prop_Send, "m_flTimerLength");
+			SetEntProp(c42, Prop_Send, "m_bBombTicking", true);
+			SetEntPropFloat(c42, Prop_Send, "m_flTimerLength", bombTime);
+			SetEntPropFloat(c42, Prop_Send, "m_flC4Blow", GetEntPropFloat(c4, Prop_Send, "m_flC4Blow"));
+			DispatchSpawn(c42);
+			ActivateEntity(c42);
+			char g_sOutput[32];
+			Format(g_sOutput, sizeof(g_sOutput), "OnUser1 !self:ClearParent::%f:1", bombTime - 0.3);
+			Format(g_sOutput, sizeof(g_sOutput), "OnUser2 !self:Kill::%f:1", bombTime - 0.2);
+			SetVariantString(g_sOutput);
+			AcceptEntityInput(c42, "AddOutput");
+			AcceptEntityInput(c42, "FireUser1");
+			AcceptEntityInput(c42, "FireUser2");
+			SetEntityRenderMode(c42, RENDER_NONE);
+			secondaryC4 = EntIndexToEntRef(c42);
+			SDKHook(c42, SDKHook_SetTransmit, OnShouldDisplay);
+			//End of second c4.
+
+			plantedC4 = EntIndexToEntRef(c4);
+			SDKHook(c4, SDKHook_SetTransmit, OnShouldDisplay);
 			if(cBombEntity.IntValue > 0) {
-				int c4wep = CreateEntityByName("weapon_c4");
+				//Some how doesn't register as an actual C4.
+				// naturally disabling planting.
+				int c4wep = CreateEntityByName("weapon_c4"); 
 				DispatchSpawn(c4wep);
 				SetEntityRenderMode(c4wep, RENDER_NONE);
 				c4weapon = EntIndexToEntRef(c4wep);
 				EquipPlayerWeapon(player, c4wep);
 			}
-			parentEntity(c4, player, "c4");
 		}
 	}
+}
+
+public Action:OnShouldDisplay(ent, client) {
+	if(!c4Planted) return Plugin_Continue;
+	int c4client = GetClientOfUserId(plyCarryingC4);
+	if(client != c4client && ent == EntRefToEntIndex(plantedC4)) return Plugin_Continue;
+	if(client == c4client && ent == EntRefToEntIndex(secondaryC4)) return Plugin_Continue;
+	return Plugin_Handled;
 }
 
 public Action Event_RoundEnd(Event event, const char[] name, bool dontBroadcast) {
 	c4Planted = false;
 	c4weapon = -1;
 	plantedC4 = -1;
+	secondaryC4 = -1;
 }
 
 public void parentEntity(int child, int parent, const char[] attachment) {
