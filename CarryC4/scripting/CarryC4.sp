@@ -32,7 +32,7 @@ GameRules_SetProp("m_bBombPlanted", false, _, _, true);
 #pragma semicolon 1
 #include <sdktools>
 #include <sdkhooks>
-#define PLUGIN_VERSION "1.0.0"
+#define PLUGIN_VERSION "1.0.1"
 int plyCarryingC4;
 bool c4Planted = false;
 int plantedC4;
