@@ -153,6 +153,7 @@ public Action OnWeaponDrop(int client, int weapon) {
 			SetEntityRenderMode(weapon, RENDER_NONE);
 			parentEntity(plantedC4, c4weapon, "");
 			TeleportEntity(plantedC4, emptyVector, emptyVector, NULL_VECTOR);
+			return Plugin_Continue;
 		} else {
 			return Plugin_Handled;
 		}
