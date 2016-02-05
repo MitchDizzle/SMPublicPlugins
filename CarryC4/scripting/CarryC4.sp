@@ -189,6 +189,8 @@ public Action Event_BombPlanted(Event event, const char[] name, bool dontBroadca
 			ActivateEntity(c42);
 			char g_sOutput[32];
 			Format(g_sOutput, sizeof(g_sOutput), "OnUser1 !self:ClearParent::%f:1", bombTime - 0.3);
+			SetVariantString(g_sOutput);
+			AcceptEntityInput(c42, "AddOutput");
 			Format(g_sOutput, sizeof(g_sOutput), "OnUser2 !self:Kill::%f:1", bombTime - 0.2);
 			SetVariantString(g_sOutput);
 			AcceptEntityInput(c42, "AddOutput");
