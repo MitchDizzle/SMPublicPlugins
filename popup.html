@@ -1,0 +1,28 @@
+<html>
+ <head>
+  <title>Popup</title>
+ </head>
+ <body onLoad="proccessURL()">
+<script type="text/javascript">
+	function proccessURL() {
+		var url = window.location.href.indexOf("?url=");
+		if(url != -1)
+		{
+			var len =  window.location.href.length;
+			if(url + 6 < len)
+			{
+				var opt = window.location.href.indexOf("&opt=");
+				if(opt != -1)
+				{
+					window.open(window.location.href.substring(url+5, opt), "__blank", window.location.href.substring(opt+5, len));
+				}
+				else
+				{//height=720,width=1280"
+					window.open(window.location.href.substring(url+5, len), "_blank", "fullscreen=yes, titlebar=yes, toolbar=yes, scrollbars=yes");
+				}
+			}
+		}
+	}
+</script>
+ </body>
+</html>
